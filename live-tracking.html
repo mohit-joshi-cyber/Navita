@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Bus Tracking</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: black;
+            color: white;
+        }
+
+        #map {
+            height: 500px;
+            width: 80%;
+            margin: 20px auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #coordinates {
+            font-size: 18px;
+            margin-top: 10px;
+            font-weight: bold;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Live Bus Tracking</h2>
+    <div id="map"></div>
+    <div id="coordinates">Tracking all buses...</div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        console.log("Initializing Firebase...");
+
+        // 🔥 Import Firebase Modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        // 🔥 Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAMs7Gyspl269Yqj1Ox14-K7-kPZ3YrQg",
+            authDomain: "navita-b6534.firebaseapp.com",
+            databaseURL: "https://navita-b6534-default-rtdb.firebaseio.com",
+            projectId: "navita-b6534",
+            storageBucket: "navita-b6534.appspot.com",
+            messagingSenderId: "447904462174",
+            appId: "1:447904462174:web:5e989a0bbc7a8cc6c3cbcf",
+            measurementId: "G-L2ZHLHD7V8"
+        };
+
+        // 🔥 Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        console.log("Firebase initialized successfully.");
+
+        // 🗺️ Initialize the Leaflet Map
+        var map = L.map('map').setView([24.5822, 73.7086], 12); // Default view (Udaipur)
+
+        // Load OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Bus marker icon
+        const busIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/128/2959/2959936.png',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        });
+
+        // 🔍 Static Bus Locations
+        const busLocations = {
+            "10123": { lat: 24.5794, lng: 73.6890 }, // Static bus
+            "1062": { lat: 24.5700, lng: 73.6875 }   // Static bus
+        };
+
+        let busMarkers = {}; // Store bus markers
+
+        // 🚍 Function to Add or Update Bus Marker
+        function updateBusMarker(busNo, lat, lng) {
+            if (busMarkers[busNo]) {
+                // Update existing marker position
+                busMarkers[busNo].setLatLng([lat, lng]);
+            } else {
+                // Create new marker if not exists
+                busMarkers[busNo] = L.marker([lat, lng], { icon: busIcon }).addTo(map)
+                    .bindPopup(`Bus No: ${busNo}`)
+                    .openPopup();
+            }
+        }
+
+        // 🔄 Add Static Buses to Map
+        for (const busNo in busLocations) {
+            const { lat, lng } = busLocations[busNo];
+            updateBusMarker(busNo, lat, lng);
+        }
+
+        // 🚀 Real-Time Tracking for Bus `1016`
+        const locationRef = ref(database, 'location');
+
+        onValue(locationRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                const lat = data.latitude;
+                const lng = data.longitude;
+                console.log(`Updating Bus No. 1016 - Latitude: ${lat}, Longitude: ${lng}`);
+
+                updateBusMarker("1016", lat, lng);
+            } else {
+                console.error("No location data found for bus 1016.");
+            }
+        });
+    </script>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+</body>
+</html>

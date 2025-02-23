@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bus Tracking</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: black;
+            color: white;
+        }
+
+        #status {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+            color: red; /* Default: Offline (Red) */
+        }
+
+        #map {
+            height: 500px;
+            width: 80%;
+            margin: 20px auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #coordinates {
+            font-size: 18px;
+            margin-top: 10px;
+            font-weight: bold;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Bus Tracking</h2>
+    <div id="status">Status: <span id="trackerStatus">Offline</span></div> <!-- Online/Offline Status -->
+    <div id="map"></div>
+    <div id="coordinates"></div>
+<div id="speed"></div> <!-- This will display the real-time speed -->
+<div id="trackerStatus"></div> <!-- This will show whether the bus is online or offline -->
+
+<script type="module">
+    import { auth } from "./firebase-config.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            alert("You must log in to access this page.");
+            window.location.href = "login.html";
+        }
+    });
+</script>
+    
+
+    <!-- Firebase SDK -->
+<script type="module">
+    console.log("Initializing Firebase...");
+
+    // 🔥 Import Firebase Modules
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+    // 🔥 Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyAMs7Gyspl269Yqj1Ox14-K7-kPZP3YrQg",
+        authDomain: "navita-b6534.firebaseapp.com",
+        databaseURL: "https://navita-b6534-default-rtdb.firebaseio.com",
+        projectId: "navita-b6534",
+        storageBucket: "navita-b6534.appspot.com",
+        messagingSenderId: "447904462174",
+        appId: "1:447904462174:web:5e989a0bbc7a8cc6c3cbcf",
+        measurementId: "G-L2ZHLHD7V8"
+    };
+
+    // 🔥 Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    console.log("Firebase initialized successfully.");
+
+    // Get Bus Number from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const busNo = urlParams.get("busNo");
+    console.log("Bus Number from URL:", busNo);
+
+    // 🗺️ Initialize the Leaflet Map
+    var map = L.map('map').setView([24.2827, 73.9837], 12); // Default view (Udaipur, India)
+
+    // Load OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Bus marker icon
+    const busIcon = L.icon({
+        iconUrl: 'https://cdn-icons-png.flaticon.com/128/2959/2959936.png',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+    });
+
+    // Static Bus Locations (Static buses will stay offline)
+    const busLocations = {
+        "10123": { lat: 24.5794, lng: 73.6890 }, // Static bus
+        "1062": { lat: 24.5700, lng: 73.6875 }   // Static bus
+    };
+
+    // Function to update coordinates and speed on the UI
+    function updateCoordinatesAndSpeed(lat, lng, speed) {
+        document.getElementById('coordinates').innerHTML = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
+        document.getElementById('speed').innerHTML = `Speed: ${speed.toFixed(2)} km/h`;
+    }
+
+    // Function to update tracker status
+    function updateStatus(online) {
+        const statusElement = document.getElementById('trackerStatus');
+        if (online) {
+            statusElement.textContent = "Online";
+            statusElement.style.color = "limegreen"; // Green for online
+        } else {
+            statusElement.textContent = "Offline";
+            statusElement.style.color = "red"; // Red for offline
+        }
+    }
+
+    let busMarker; // Variable to store the bus marker
+    let lastUpdateTime = Date.now(); // Track last update time
+
+    // 🚍 Check if bus number is 1016 (Real-Time) or Static
+    if (busNo === "1016") {
+        console.log("Tracking Bus 1016 in Real-Time from Firebase");
+
+        // Initially set status to Offline before receiving GPS data
+        updateStatus(false);
+
+        // 📡 Listen for real-time updates for bus 1016 from Firebase
+        const locationRef = ref(database, 'location'); // Path to real-time location
+
+        onValue(locationRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                const lat = data.latitude;
+                const lng = data.longitude;
+                const speed = data.speed_kmph;  // Extract speed data
+                console.log(`Updating Bus No. 1016 - Latitude: ${lat}, Longitude: ${lng}, Speed: ${speed}`);
+
+                // If marker doesn't exist, create it. Otherwise, update position.
+                if (!busMarker) {
+                    busMarker = L.marker([lat, lng], { icon: busIcon }).addTo(map)
+                        .bindPopup("Bus No: 1016")
+                        .openPopup();
+                } else {
+                    busMarker.setLatLng([lat, lng]); // Update marker position
+                }
+
+                // Update map view to follow the bus
+                map.setView([lat, lng], map.getZoom());
+                updateCoordinatesAndSpeed(lat, lng, speed);  // Update coordinates and speed UI
+                updateStatus(true); // Bus is online
+
+                lastUpdateTime = Date.now(); // Update last received time
+            } else {
+                console.error("No location data found for bus 1016.");
+                updateStatus(false); // Bus is offline
+            }
+        });
+
+        // ⏳ Check if bus goes offline after 10 seconds of no updates
+        setInterval(() => {
+            if (Date.now() - lastUpdateTime > 10000) { // 10 seconds timeout
+                updateStatus(false); // Mark as offline
+            }
+        }, 5000); // Check every 5 seconds
+
+    } else if (busLocations[busNo]) {
+        console.log(`Tracking Static Bus No. ${busNo}`);
+
+        // Static buses are always considered "Offline"
+        updateStatus(false);
+
+        // Get static bus location
+        const { lat, lng } = busLocations[busNo];
+
+        // Add marker for the static bus
+        busMarker = L.marker([lat, lng], { icon: busIcon }).addTo(map)
+            .bindPopup(`Bus No: ${busNo}`)
+            .openPopup();
+
+        // Update coordinates UI
+        updateCoordinatesAndSpeed(lat, lng, 0);  // Static buses have 0 speed
+        map.setView([lat, lng], 14); // Move map to static bus position
+    } else {
+        console.error(`Bus location not found for bus number: ${busNo}`);
+        document.getElementById('coordinates').innerHTML = `Bus No: ${busNo} - Location Not Found`;
+        updateStatus(false);
+    }
+</script>
+
+
+    <!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</body>
+</html>

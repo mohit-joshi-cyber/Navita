@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: #fff;
+        }
+
+        header {
+            background-color: #0056b3;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+            font-size: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #1c1c1c;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #ffcc00;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.1rem;
+            margin: 15px 0;
+            color: #ddd;
+        }
+
+        #user-name,
+        #user-dob {
+            font-weight: 600;
+            color: #ffcc00;
+        }
+
+        #logout-btn {
+            background-color: #ff0000;
+            border: none;
+            color: #fff;
+            font-size: 1.1rem;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        #logout-btn:hover {
+            background-color: #e60000;
+        }
+
+        #logout-btn:active {
+            background-color: #cc0000;
+        }
+
+        #logout-btn:focus {
+            outline: none;
+        }
+
+        .highlight-red {
+            background-color: #ff0000;
+            color: white;
+        }
+
+        .highlight-red:hover {
+            background-color: #ff4d4d;
+        }
+
+        .highlight-red:active {
+            background-color: #e60000;
+        }
+
+        /* Responsiveness */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 20px;
+            }
+
+            h1 {
+                font-size: 1.6rem;
+            }
+
+            p {
+                font-size: 1rem;
+            }
+
+            #logout-btn {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                font-size: 1.5rem;
+            }
+
+            h1 {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        User Profile
+    </header>
+
+    <div class="container">
+        <h1>Welcome to Your Profile</h1>
+        <p id="user-name">Name: Loading...</p>
+        <p id="user-dob">DOB: Loading...</p>
+        <button id="logout-btn" class="highlight-red">Logout</button>
+    </div>
+
+    <script type="module">
+        import { auth, db } from "./firebase-config.js";
+        import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const logoutBtn = document.getElementById("logout-btn");
+        const userNameElement = document.getElementById("user-name");
+        const userDobElement = document.getElementById("user-dob");
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Check if user data is already in localStorage
+                const storedUserData = JSON.parse(localStorage.getItem("userData"));
+
+                if (storedUserData) {
+                    // Use the stored data
+                    userNameElement.innerText = `Name: ${storedUserData.fullname}`;
+                    userDobElement.innerText = `DOB: ${storedUserData.dob}`;
+                } else {
+                    // Fetch user data from Firestore if not already stored
+                    const userDocRef = doc(db, "users", user.uid);
+                    try {
+                        const docSnap = await getDoc(userDocRef);
+                        if (docSnap.exists()) {
+                            const userData = docSnap.data();
+                            userNameElement.innerText = `Name: ${userData.fullname}`;
+                            userDobElement.innerText = `DOB: ${userData.dob}`;
+
+                            // Store user data in localStorage
+                            localStorage.setItem("userData", JSON.stringify(userData));
+                        } else {
+                            console.error("No such user document!");
+                        }
+                    } catch (error) {
+                        console.error("Error fetching user data:", error);
+                    }
+                }
+
+                // Show logout button
+                logoutBtn.style.display = "inline-block";
+            } else {
+                // Redirect to login if user is not logged in
+                window.location.href = "login.html";
+            }
+        });
+
+        // Logout logic
+        if (logoutBtn) {
+            logoutBtn.addEventListener("click", () => {
+                signOut(auth)
+                    .then(() => {
+                        // Remove user data from localStorage
+                        localStorage.removeItem("userData");
+                        window.location.href = "login.html"; // Redirect to login page
+                    })
+                    .catch((error) => {
+                        console.error("Logout error:", error);
+                    });
+            });
+        }
+    </script>
+
+</body>
+
+</html>
